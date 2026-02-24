@@ -990,6 +990,21 @@ function updateStats() {
   document.getElementById('stat-aging').textContent = all.filter(w=>w.aging_candidate).length;
 }
 
+function wineAge(year) {
+  if (!year || year === 'NV') return 'NV';
+  const y = parseInt(year);
+  if (isNaN(y)) return '—';
+  const now = new Date();
+  const years = (now.getFullYear() - y)
+  //const totalMonths = (now.getFullYear() - y) * 12 + now.getMonth();
+  if (years < 0) return '—';
+  //const years = Math.floor(totalMonths / 12);
+  //const months = totalMonths % 12;
+  //if (years === 0) return `${months}mo`;
+  //if (months === 0) return `${years}y`;
+  return `${years}y`;
+}
+
 // ─── VIEWS ───────────────────────────────────────────────────────────────────
 function setView(v, btn) {
   currentView = v;
@@ -1015,7 +1030,8 @@ function renderTable() {
     { key: 'year', label: 'Year' }, { key: 'type', label: 'Type' },
     { key: 'winery', label: 'Winery' }, { key: 'name', label: 'Name' },
     { key: 'grape', label: 'Grape' }, { key: 'location', label: 'Location' },
-    { key: 'aging_candidate', label: 'Aging' },
+    { key: 'aging_candidate', label: 'Aging' }, { key: 'year', label: 'Year'},
+    { key: '_age', label: 'Age'}
   ];
   let html = '<div class="table-wrap"><table><thead><tr>';
   cols.forEach(c => {
@@ -1040,6 +1056,8 @@ function renderTable() {
         <td>${w.grape || '—'}</td>
         <td>${loc}</td>
         <td>${aging}</td>
+        <td>${w.year || '—'}</td>
+        <td style="color:var(--muted);font-size:0.75rem">${wineAge(w.year)}</td>
         <td>
           <button class="action-btn" onclick="editWine('${w.id}')" title="Edit">✎</button>
           <button class="action-btn" onclick="confirmDelete('${w.id}')" title="Delete">✕</button>
@@ -1074,6 +1092,7 @@ function renderCards() {
       <div class="card-winery">${w.winery || ''}</div>
       <div class="card-name">${displayName}</div>
       <div class="card-grape">${w.grape || ''}</div>
+      <div class="card-grape">${w.grape || ''} · <span style="color:var(--muted)">${wineAge(w.year)}</span></div>
       <div class="card-footer">
         <div>
           <span class="location-badge" style="font-size:0.65rem">${loc}</span>
