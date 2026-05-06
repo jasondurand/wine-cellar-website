@@ -847,18 +847,31 @@ function importJSON(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = ev => {
+  reader.onload = async ev => {
     try {
       const data = JSON.parse(ev.target.result);
       if (!Array.isArray(data)) throw new Error('Expected an array');
-      wines = data;
+      
+      // Strip local ids so Supabase generates its own
+      const cleaned = data.map(({ id, ...rest }) => rest);
+      
+      if (isConfigured()) {
+        if (!confirm(`This will add ${cleaned.length} bottles to Supabase. Continue?`)) return;
+        const res = await sbFetch('wines', {
+          method: 'POST',
+          body: JSON.stringify(cleaned)
+        });
+        await loadWines();
+      } else {
+        wines = data;
+      }
       renderCurrent();
     } catch(err) {
-      alert('Could not read file: ' + err.message);
+      alert('Could not import: ' + err.message);
     }
   };
   reader.readAsText(file);
-  e.target.value = ''; // reset so same file can be re-imported
+  e.target.value = '';
 }
 
 // ─── DATA (demo fallback) ────────────────────────────────────────────────────
