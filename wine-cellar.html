@@ -853,17 +853,36 @@ function importJSON(e) {
       if (!Array.isArray(data)) throw new Error('Expected an array');
       
       // Strip local ids so Supabase generates its own
-      const cleaned = data.map(({ id, ...rest }) => rest);
+      const cleaned = data.map(({ id, created_at, ...rest }) => rest);
       
+      // if (isConfigured()) {
+      //   if (!confirm(`This will add ${cleaned.length} bottles to Supabase. Continue?`)) return;
+      //   const res = await atFetch('wines', {
+      //     method: 'POST',
+      //     body: JSON.stringify(cleaned)
+      //   });
+      //   await loadWines();
+      // } else {
+      //   wines = data;
+      // }
       if (isConfigured()) {
-        if (!confirm(`This will add ${cleaned.length} bottles to Supabase. Continue?`)) return;
-        const res = await sbFetch('wines', {
-          method: 'POST',
-          body: JSON.stringify(cleaned)
-        });
+        if (!confirm(`This will add ${cleaned.length} bottles to Airtable. Continue?`)) return;
+        
+        // Airtable only accepts 10 records at a time
+        const chunks = [];
+        for (let i = 0; i < cleaned.length; i += 10) {
+          chunks.push(cleaned.slice(i, i + 10));
+        }
+        
+        for (const chunk of chunks) {
+          await atFetch('wines', {
+            method: 'POST',
+            body: JSON.stringify({
+              records: chunk.map(w => ({ fields: w }))
+            })
+          });
+        }
         await loadWines();
-      } else {
-        wines = data;
       }
       renderCurrent();
     } catch(err) {
@@ -889,27 +908,49 @@ const DEMO_DATA = [
   { id: 'd6', location: 'cellar', shelf: 'C', slot: '7', year: 2016, type: 'red', grape: 'Cabernet Sauvignon', winery: 'Quilceda Creek', name: '', aging_candidate: true, notes: '' },
 ];
 
-// ─── SUPABASE HELPERS ─────────────────────────────────────────────────────────
-async function sbFetch(path, opts = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+// ─── AIRTABLE HELPERS ─────────────────────────────────────────────────────────
+
+async function atFetch(path, opts = {}) {
+  const res = await fetch(`https://api.airtable.com/v0/${SUPABASE_URL}/${path}`, {
     ...opts,
     headers: {
-      'apikey': SUPABASE_KEY,
       'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
       ...(opts.headers || {})
     }
   });
-  if (!res.ok) throw new Error(`Supabase error: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`Airtable error: ${res.status} ${await res.text()}`);
   const text = await res.text();
   return text ? JSON.parse(text) : null;
+}
+
+// Convert Airtable record format to our flat wine object
+function fromAT(record) {
+  return {
+    id: record.id,
+    ...record.fields,
+    aging_candidate: record.fields.aging_candidate || false,
+  };
+}
+
+// Convert our flat wine object to Airtable fields format
+function toAT(wine) {
+  const { id, ...fields } = wine;
+  return { fields };
 }
 
 async function loadWines() {
   if (!isConfigured()) { wines = [...DEMO_DATA]; return; }
   try {
-    wines = await sbFetch('wines?order=year.asc');
+    let all = [];
+    let offset = null;
+    do {
+      const url = 'wines' + (offset ? `?offset=${offset}` : '');
+      const res = await atFetch(url);
+      all = all.concat(res.records.map(fromAT));
+      offset = res.offset;
+    } while (offset);
+    wines = all;
   } catch(e) {
     alert('Error loading wines: ' + e.message);
     wines = [];
@@ -922,8 +963,8 @@ async function createWine(data) {
     wines.push(data);
     return data;
   }
-  const res = await sbFetch('wines', { method: 'POST', body: JSON.stringify(data) });
-  const w = Array.isArray(res) ? res[0] : res;
+  const res = await atFetch('wines', { method: 'POST', body: JSON.stringify(toAT(data)) });
+  const w = fromAT(res);
   wines.push(w);
   return w;
 }
@@ -934,8 +975,8 @@ async function updateWine(id, data) {
     if (i > -1) wines[i] = { ...wines[i], ...data };
     return;
   }
-  const res = await sbFetch(`wines?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(data) });
-  const updated = Array.isArray(res) ? res[0] : res;
+  const res = await atFetch(`wines/${id}`, { method: 'PATCH', body: JSON.stringify(toAT(data)) });
+  const updated = fromAT(res);
   const i = wines.findIndex(w => w.id === id);
   if (i > -1) wines[i] = updated;
 }
@@ -945,11 +986,12 @@ async function deleteWine(id) {
     wines = wines.filter(w => w.id !== id);
     return;
   }
-  await sbFetch(`wines?id=eq.${id}`, { method: 'DELETE', headers: { 'Prefer': '' } });
+  await atFetch(`wines/${id}`, { method: 'DELETE' });
   wines = wines.filter(w => w.id !== id);
 }
 
 function isConfigured() { return SUPABASE_URL && SUPABASE_KEY; }
+
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 async function init() {
