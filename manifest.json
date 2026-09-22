@@ -1,0 +1,15 @@
+{
+  "name": "Cave — Wine Cellar",
+  "short_name": "Cave",
+  "start_url": "/wine-cellar-website/",
+  "display": "standalone",
+  "background_color": "#1a1209",
+  "theme_color": "#1a1209",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/maps/wine_bar/materialicons/48dp_1x/baseline_wine_bar_black_48dp.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    }
+  ]
+}
