@@ -678,11 +678,11 @@ alter table wines enable row level security;
 create policy "Allow all" on wines for all using (true) with check (true);</code></pre>
   <div class="setup-inputs">
     <div class="form-group">
-      <label>Supabase Project URL</label>
+      <label>Airtable Project ID</label>
       <input type="text" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
     </div>
     <div class="form-group">
-      <label>Supabase Anon Key</label>
+      <label>Airtable App Token</label>
       <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
     </div>
   </div>
@@ -824,6 +824,9 @@ create policy "Allow all" on wines for all using (true) with check (true);</code
         </div>
       </div>
       <div class="form-actions">
+        <button type="button" class="btn" 
+          style="background:transparent;color:var(--wine);border:1px solid var(--wine);margin-right:auto" 
+          onclick="deleteFromModal()" id="delete-btn">Delete</button>
         <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary" id="save-btn">Add Bottle</button>
       </div>
@@ -1120,7 +1123,6 @@ function renderTable() {
         <td style="color:var(--muted);font-size:0.75rem">${wineAge(w.year)}</td>
         <td>
           <button class="action-btn" onclick="editWine('${w.id}')" title="Edit">✎</button>
-          <button class="action-btn" onclick="confirmDelete('${w.id}')" title="Delete">✕</button>
         </td>
       </tr>`;
     });
@@ -1160,7 +1162,6 @@ function renderCards() {
         </div>
         <div class="card-actions">
           <button class="action-btn" onclick="editWine('${w.id}')">✎</button>
-          <button class="action-btn" onclick="confirmDelete('${w.id}')">✕</button>
         </div>
       </div>
     </div>`;
@@ -1263,6 +1264,7 @@ function hideTip() { document.getElementById('tooltip').style.display = 'none'; 
 // ─── MODAL ────────────────────────────────────────────────────────────────────
 function openModal(wine = null) {
   document.getElementById('modal-title').textContent = wine ? 'Edit Bottle' : 'Add a Bottle';
+  document.getElementById('delete-btn').style.display = wine ? 'block' : 'none';
   document.getElementById('save-btn').textContent = wine ? 'Save Changes' : 'Add Bottle';
   document.getElementById('edit-id').value = wine ? wine.id : '';
   document.getElementById('f-location').value = wine ? wine.location : '';
@@ -1285,6 +1287,13 @@ function openModalAtSlot(shelf, slot) {
   document.getElementById('f-shelf').value = shelf;
   document.getElementById('f-slot').value = slot;
   toggleLocationFields();
+}
+
+function deleteFromModal() {
+  const id = document.getElementById('edit-id').value;
+  if (!id) return;
+  confirmDelete(id);
+  closeModal();
 }
 
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
