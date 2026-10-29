@@ -753,7 +753,8 @@ create policy "Allow all" on wines for all using (true) with check (true);</code
     <h2 id="modal-title">Add a Bottle</h2>
     <label id="camera-btn" style="display:none;cursor:pointer;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;padding:8px 16px;background:var(--ink);color:var(--parchment);margin-bottom:24px;display:inline-block">
       📷 Scan Label
-      <input type="file" accept="image/*" capture="environment" onchange="scanLabel(event)" style="display:none">
+      <!-- <input type="file" accept="image/*" capture="environment" onchange="scanLabel(event)" style="display:none"> -->
+      <input type="file" accept="image/*" onchange="scanLabel(event)" style="display:none">
     </label>
     <form id="wine-form" onsubmit="saveWine(event)">
       <input type="hidden" id="edit-id">
