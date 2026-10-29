@@ -685,6 +685,10 @@ create policy "Allow all" on wines for all using (true) with check (true);</code
       <label>Airtable App Token</label>
       <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
     </div>
+    <div class="form-group">
+      <label>Cloudflare Worker URL</label>
+      <input type="text" id="sb-worker" placeholder="https://cave-label-proxy.yourusername.workers.dev">
+    </div>
   </div>
   <div style="display:flex;gap:10px">
     <button class="btn btn-primary" onclick="saveConfig()">Save & Connect</button>
@@ -747,6 +751,10 @@ create policy "Allow all" on wines for all using (true) with check (true);</code
   <div class="modal">
     <button class="modal-close" onclick="closeModal()">✕</button>
     <h2 id="modal-title">Add a Bottle</h2>
+    <label id="camera-btn" style="display:none;cursor:pointer;font-size:0.7rem;letter-spacing:0.15em;text-transform:uppercase;padding:8px 16px;background:var(--ink);color:var(--parchment);margin-bottom:24px;display:inline-block">
+      📷 Scan Label
+      <input type="file" accept="image/*" capture="environment" onchange="scanLabel(event)" style="display:none">
+    </label>
     <form id="wine-form" onsubmit="saveWine(event)">
       <input type="hidden" id="edit-id">
       <div class="form-row">
@@ -841,6 +849,7 @@ create policy "Allow all" on wines for all using (true) with check (true);</code
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 let SUPABASE_URL = localStorage.getItem('cave_url') || '';
 let SUPABASE_KEY = localStorage.getItem('cave_key') || '';
+let WORKER_URL = localStorage.getItem('cave_worker') || '';
 
 // --- IMPORT and EXPORT buttons -----
 function exportJSON() {
@@ -996,6 +1005,44 @@ async function deleteWine(id) {
   }
   await atFetch(`wines/${id}`, { method: 'DELETE' });
   wines = wines.filter(w => w.id !== id);
+}
+
+async function scanLabel(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const cameraBtn = document.getElementById('camera-btn');
+  cameraBtn.textContent = '⏳ Scanning…';
+
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      // Strip the data:image/jpeg;base64, prefix
+      const base64 = ev.target.result.split(',')[1];
+
+      const res = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64 })
+      });
+
+      if (!res.ok) throw new Error('Worker error: ' + res.status);
+      const wine = await res.json();
+
+      // Pre-fill the form with whatever came back
+      if (wine.winery) document.getElementById('f-winery').value = wine.winery;
+      if (wine.name) document.getElementById('f-name').value = wine.name;
+      if (wine.year) document.getElementById('f-year').value = wine.year;
+      if (wine.type) document.getElementById('f-type').value = wine.type.toLowerCase();
+      if (wine.grape) document.getElementById('f-grape').value = wine.grape;
+
+    } catch(err) {
+      alert('Scan failed: ' + err.message);
+    }
+    cameraBtn.innerHTML = '📷 Scan Label<input type="file" accept="image/*" capture="environment" onchange="scanLabel(event)" style="display:none">';
+    e.target.value = '';
+  };
+  reader.readAsDataURL(file);
 }
 
 function isConfigured() { return SUPABASE_URL && SUPABASE_KEY; }
@@ -1266,6 +1313,7 @@ function openModal(wine = null) {
   document.getElementById('modal-title').textContent = wine ? 'Edit Bottle' : 'Add a Bottle';
   document.getElementById('delete-btn').style.display = wine ? 'block' : 'none';
   document.getElementById('save-btn').textContent = wine ? 'Save Changes' : 'Add Bottle';
+  document.getElementById('camera-btn').style.display = WORKER_URL ? 'inline-block' : 'none';
   document.getElementById('edit-id').value = wine ? wine.id : '';
   document.getElementById('f-location').value = wine ? wine.location : '';
   document.getElementById('f-shelf').value = wine ? (wine.shelf || '') : '';
@@ -1349,6 +1397,7 @@ function showSetup() {
   document.getElementById('setup-panel').style.display = 'block';
   document.getElementById('sb-url').value = SUPABASE_URL;
   document.getElementById('sb-key').value = SUPABASE_KEY;
+  document.getElementById('sb-worker').value = WORKER_URL;
   document.getElementById('app-shell').style.display = 'none';
 }
 
@@ -1362,6 +1411,8 @@ async function saveConfig() {
   const key = document.getElementById('sb-key').value.trim();
   if (!url || !key) { alert('Please fill in both fields.'); return; }
   SUPABASE_URL = url; SUPABASE_KEY = key;
+  WORKER_URL = document.getElementById('sb-worker').value.trim();
+  localStorage.setItem('cave_worker', WORKER_URL);
   localStorage.setItem('cave_url', url);
   localStorage.setItem('cave_key', key);
   hideSetup();
